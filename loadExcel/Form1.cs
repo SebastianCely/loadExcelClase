@@ -37,7 +37,7 @@ namespace loadExcel
                     List<Empleado> lista = LeerExcel(ofd.FileName);
                     dgvDatos.DataSource = lista;
 
-                    dgvDatos.Columns["Sueldo"].DefaultCellStyle.Format = "NO";
+                    dgvDatos.Columns["Sueldo"].DefaultCellStyle.Format = "No";
                     dgvDatos.Columns["Sueldo"].DefaultCellStyle.FormatProvider = new System.Globalization.CultureInfo("es-CO");
                 }
             }
@@ -86,9 +86,67 @@ namespace loadExcel
                     {
                         MessageBox.Show(string.Join("\n", errores));
                     }
+                    decimal totalNomina = empleados.Sum(e => e.Sueldo);
+                    MessageBox.Show(totalNomina.ToString("C0", new System.Globalization.CultureInfo("es-CO")));
+                    var agrupado = empleados
+                        .GroupBy(e => e.TipoDoc)
+                        .Select(g => new
+                        {
+                            TipoDoc = g.Key,
+                            cantidad = g.Count(),
+                            Total = g.Sum(x => x.Sueldo)
+                        })
+                        .ToList();
+                    dgvResumen.DataSource = agrupado;
+                    var estadisticas = new
+                    {
+                        Promedio = empleados.Average(e => e.Sueldo),
+                        Maximo = empleados.Max(e => e.Sueldo),
+                        Minimo = empleados.Min(e => e.Sueldo),
+                        Total = empleados.Sum(e => e.Sueldo),
+                        Cantidad = empleados.Count()
+                    };
+                    dgvEstadisticas.DataSource = new List<object> { estadisticas };
+                    var duplicados = empleados
+                        .GroupBy(e => e.NroDoc)
+                        .Where(g =>  g.Count() > 1)
+                        .Select(g => g.Key)
+                        .ToList();
+                    if (duplicados.Any())
+                    {
+                        MessageBox.Show("Documentos duplicados:\n" + string.Join("\n", duplicados));
+                    }
+                    else
+                    {
+                        MessageBox.Show("No hay duplicados");
+                    }
                 }
             }
             return empleados;
+        }
+
+        private void btnExportar_Click(object sender, EventArgs e)
+        {
+            ExportarCSV(empleados);
+        }
+
+        private void ExportarCSV(List<Empleado> empleados)
+        {
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "CSV (*.csv)|*.csv*";
+                sfd.FileName = "Nomina.csv";
+                if (sfd.ShowDialog() == DialogResult.OK) { 
+                    var lineas = new List<string>();
+                    lineas.Add("tipo_doc,nro_doc,sueldo");
+                    foreach (var emp in empleados)
+                    {
+                        lineas.Add($"{emp.TipoDoc},{emp.NroDoc}, {emp.Sueldo}");
+                    }
+                    File.WriteAllLines(sfd.FileName, lineas);
+                    MessageBox.Show("Archivo CSV exportado correctamente");
+                }
+            }
         }
     }
 }
